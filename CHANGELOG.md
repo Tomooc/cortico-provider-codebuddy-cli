@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.5
+
+- 仓库改名为 `cortico-provider-codebuddy-cli`，与插件包名对齐；README 标题与开头的「仓库名 / 包名」对照同步更新，并注明旧名 `coopanion-workbuddy-cli` 会自动重定向。
+- 代码零变更，`src/*` 与 0.2.4 逐字节相同。
+
 ## 0.2.4
 
 - README 的项目名改为仓库名 `coopanion-workbuddy-cli`，并在开头注明包名仍为 `cortico-provider-codebuddy-cli`（Coopanion 扩展按包名识别，改包名会让已装扩展失联）。

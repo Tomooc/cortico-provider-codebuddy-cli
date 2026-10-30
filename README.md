@@ -1,9 +1,9 @@
-# coopanion-workbuddy-cli
+# cortico-provider-codebuddy-cli
 
 把 **CodeBuddy 官方 CLI** 接成 Coopanion（Cortico 内核）的一个模型端点。CLI 只当「无状态、只会按 JSON Schema 吐结构化结果」的推理后端，**工具执行权 100% 留在 Coopanion**。
 
-> **仓库名**：`coopanion-workbuddy-cli` — https://github.com/Tomooc/coopanion-workbuddy-cli
-> **包名**：`cortico-provider-codebuddy-cli` — Coopanion 扩展按包名 + `cortico-provider` 关键字识别，所以包名与仓库名不同；下文出现的扩展目录名、`dependencies` 键、tarball 文件名都是包名。
+> **仓库名与包名一致**：`cortico-provider-codebuddy-cli` — https://github.com/Tomooc/cortico-provider-codebuddy-cli
+> Coopanion 扩展按包名 + `cortico-provider` 关键字识别，所以仓库名、扩展目录名、`dependencies` 键、tarball 文件名统一用这个包名。旧仓库名 `coopanion-workbuddy-cli` 会自动重定向到新地址，老 clone 与推送不会断。
 
 ## 原理
 
@@ -32,12 +32,12 @@ Coopanion 发起 Responses 请求（instructions + context items + tools）
 
 > **实测限制**：扩展页的安装接口（`POST /api/extensions/check` / `install`）只接受**目录路径**。填 `.tgz` 会被拒：`{"error":"目录不存在: ...tgz"}`；填解压后的目录则正常返回 `{"name":...,"version":...,"kind":"provider"}`。
 >
-> 所以：`tar -xzf cortico-provider-codebuddy-cli-0.2.4.tgz` 取出里面的 `package/` 目录再填，或者直接填源码目录。
+> 所以：`tar -xzf cortico-provider-codebuddy-cli-0.2.5.tgz` 取出里面的 `package/` 目录再填，或者直接填源码目录。
 >
 > **要让别人真正一键装**：把包发布到 npm（`npm publish`，包名带 `cortico-provider` 关键字即可被「扩展」页的市场检索命中），之后别人只需在市场里搜索安装，不碰本地路径。
 
 1. 把本目录打成 tarball：`npm pack`（或直接用目录本身）。
-2. 打开 Coopanion → 「扩展」页 → 安装 → 填 **本地路径**（`...\cortico-provider-codebuddy-cli-0.2.4.tgz` 解压后的目录，或源码目录）。
+2. 打开 Coopanion → 「扩展」页 → 安装 → 填 **本地路径**（`...\cortico-provider-codebuddy-cli-0.2.5.tgz` 解压后的目录，或源码目录）。
 3. 重启 Core（扩展页会提示 `restartRequired`）。
 4. 「设置 → 模型端点」新建端点，模块选 **CodeBuddy CLI**。
 
