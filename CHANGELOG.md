@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4
+
+- README 的项目名改为仓库名 `coopanion-workbuddy-cli`，并在开头注明包名仍为 `cortico-provider-codebuddy-cli`（Coopanion 扩展按包名识别，改包名会让已装扩展失联）。
+- 代码零变更，`src/*` 与 0.2.3 逐字节相同。
+
 ## 0.2.3
 
 - 修文档编码事故：README 曾被 PowerShell 以非 UTF-8 编码回写，导致 GitHub 上整篇显示为乱码（`把` → `鎶?`）。本版以 UTF-8 重写 README 全文。
