@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+
+- 修文档编码事故：README 曾被 PowerShell 以非 UTF-8 编码回写，导致 GitHub 上整篇显示为乱码（`把` → `鎶?`）。本版以 UTF-8 重写 README 全文。
+- 代码零变更：`src/*` 与 0.2.2 逐字节相同；受影响的只有文档与上一次打出的 tarball 内那份 README。
+
 ## 0.2.2
 
 - 端点页把插件自有的三项单独成卡并改名，避免与 Coopanion 内置的「模型」字段混淆：卡片标题 `CodeBuddy CLI 选项（插件）`，字段 `模型（插件 · --model）` / `推理强度（--effort）` / `上下文窗口（插件覆盖 · token）`。
