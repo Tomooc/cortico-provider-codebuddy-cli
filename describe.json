@@ -1,0 +1,16 @@
+{
+  "provider": {
+    "protocols": ["codebuddy-cli"],
+    "auth": [],
+    "local": true,
+    "input": ["text"],
+    "title": "CodeBuddy CLI",
+    "description": "Run the official CodeBuddy CLI as a stateless JSON-Schema inference backend: the CLI only returns {text, toolCalls}, and Cortico executes every tool itself.",
+    "reasoningTiers": [
+      { "id": "off", "label": "No thinking", "thinking": false },
+      { "id": "low", "label": "Thinking - fast", "thinking": true, "effort": "low" },
+      { "id": "high", "label": "Thinking - standard", "thinking": true, "effort": "high" },
+      { "id": "max", "label": "Thinking - deepest", "thinking": true, "effort": "max" }
+    ]
+  }
+}

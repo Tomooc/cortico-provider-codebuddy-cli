@@ -1,0 +1,28 @@
+{
+  "name": "cortico-provider-codebuddy-cli",
+  "version": "0.2.2",
+  "type": "module",
+  "description": "CodeBuddy CLI for Cortico: the official CLI as a stateless, JSON-Schema-only inference backend. The bot keeps tool execution; the CLI only returns {text, toolCalls}.",
+  "author": "YG",
+  "license": "MIT",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "keywords": ["cortico-provider", "cortico", "coopanion", "codebuddy", "codebuddy-cli", "llm", "cli"],
+  "engines": {
+    "node": ">=22"
+  },
+  "cortico": {
+    "kind": "provider",
+    "api": 6,
+    "displayName": "CodeBuddy CLI",
+    "icon": "icon.svg",
+    "describe": "describe.json",
+    "tags": ["provider", "llm", "cli", "local"]
+  },
+  "scripts": {
+    "test": "node tools/selftest.mjs"
+  },
+  "files": ["src", "tools", "README.md", "CHANGELOG.md", "LICENSE", "icon.svg", "describe.json"]
+}
