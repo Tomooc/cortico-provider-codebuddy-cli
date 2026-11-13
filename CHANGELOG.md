@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.7
+
+- 修国内版：`resolveCliEnv` 的 `cn` 分支改为官方 `dsh-codebuddy-cli-cn` 口径 —— 只设 `CODEBUDDY_INTERNET_ENVIRONMENT=internal`，不显式指定目录就不塞 `CODEBUDDY_CONFIG_DIR`（强塞一个不存在的 `~/.dsh-codebuddy-cli-cn` 会让 CLI 读不到登录态，等于国内版不可用）。
+- 新增 `applyCliEnv(base, { region, configDir })`：真正传给子进程的环境；cn 与自动回落时清掉从父进程继承的 `CODEBUDDY_CONFIG_DIR`，避免国际版通道串到国内版；`official` 既不注入也不清理。
+- `src/index.js` 的 `cliEnvOf()` 改用 `applyCliEnv`。
+- 模型下拉显示积分倍率：CLI 的 `_meta.credits`（`x0.29 credits`）压成 `×0.29` 拼进 `displayName`（如 `Hy4 Preview · ×0.29`）。Cortico 的 `ListedModel` 没有倍率字段、端点页只渲染 `displayName`，因此只能放在标签里；`id` 不变，不影响 `--model` 透传。
+- 实测：`/api/providers/codebuddy-intl/models` 返回 `Hy4 Preview · ×0.29`、`Hy3 · ×0.00`、`Primary · ×3.31`、`GPT-6-Astra · ×6.67` 等；`applyCliEnv` 四档输出经安装副本核对（auto/intl → intl home + public，cn → 仅 internal，official → 原样）；selftest 5/5。
+
 ## 0.2.6
 
 - 新增「区域（国际版 / 国内版）」端点配置：`auto`（检测到 `~/.dsh-codebuddy-cli-intl` 即走国际版）/ `intl` / `cn` / `official`。国际版会注入 `CODEBUDDY_CONFIG_DIR` 与 `CODEBUDDY_INTERNET_ENVIRONMENT=public`；不带这两个变量时 CLI 会落到官方默认 home（`~/.codebuddy`）拿国内凭据去打 `copilot.tencent.com`，生成阶段直接 401。
