@@ -92,6 +92,15 @@ function creditsLabel(credits) {
   return matched ? `×${matched[1]}` : text.slice(0, 24)
 }
 
+/** 下拉里为了显示倍率把标签拼进了值（`hy4-preview · ×0.29`）；传给 CLI 前必须剥回纯 id。 */
+function modelIdOf(value) {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const cut = trimmed.split('·')[0].split('×')[0].trim()
+  return cut || trimmed
+}
+
 /** 手动上下文窗口；0 = 没设，用探测值。 */
 function contextWindowOf(entry) {
   return intOption(optionsOf(entry).contextWindow, CONTEXT_WINDOW_MIN, CONTEXT_WINDOW_MAX, 0)
@@ -130,7 +139,7 @@ function resolveModel(request, settings, spec) {
   for (const candidate of candidates) {
     if (typeof candidate !== 'string') continue
     const trimmed = candidate.trim()
-    if (trimmed && trimmed !== FOLLOW_CLI_ID) return trimmed
+    if (trimmed && trimmed !== FOLLOW_CLI_ID) return modelIdOf(trimmed)
   }
   return FOLLOW_CLI_ID
 }
@@ -147,7 +156,7 @@ function buildArgs({ model, effort, schema, maxTurns }) {
     '--no-session-persistence',
     '--max-turns', String(maxTurns),
     '--system-prompt', MODEL_SYSTEM_PROMPT,
-    ...(model && model !== FOLLOW_CLI_ID ? ['--model', model] : []),
+    ...(model && model !== FOLLOW_CLI_ID ? ['--model', modelIdOf(model)] : []),
     ...(effort ? ['--effort', effort] : [])
   ]
 }
@@ -244,10 +253,22 @@ function configGroup(name, entry, language) {
     .filter((model) => model.id && model.id !== FOLLOW_CLI_ID && creditsLabel(model.credits))
     .map((model) => `${model.id} ${creditsLabel(model.credits)}`)
   const creditTable = creditRows.length ? `积分倍率：${creditRows.join(' · ')}。` : ''
+  // 配置下拉的选项文字就是值本身，没有单独的标签槽位：把倍率直接拼进值里，
+  // 例如 `hy4-preview · ×0.29`；传给 CLI 之前由 modelIdOf() 剥回纯 id。
+  const modelChoices = [...new Set(snapshot.models
+    .filter((model) => model.id && model.id !== FOLLOW_CLI_ID)
+    .map((model) => {
+      const credits = creditsLabel(model.credits)
+      return credits ? `${model.id} · ${credits}` : model.id
+    }))]
+  const currentModel = typeof optionsOf(entry).model === 'string' ? optionsOf(entry).model.trim() : ''
+  const enumValues = [FOLLOW_CLI_ID, ...modelChoices]
+  // 老配置存的是裸 id；补进 enum，保存时才不会被判「不在枚举内」。
+  if (currentModel && !enumValues.includes(currentModel)) enumValues.push(currentModel)
   const modelProperties = modelIds.length
     ? {
       type: 'string',
-      enum: [FOLLOW_CLI_ID, ...modelIds],
+      enum: enumValues,
       title: '模型（插件 · --model）',
       description: `来自 CodeBuddy CLI 的模型目录（共 ${modelIds.length} 个）；选「跟随 CLI 当前模型」则不传 --model。${creditTable ? `\n${creditTable}` : ''}`
     }
@@ -388,7 +409,7 @@ const MODULE = {
       },
       compatibilityKey() {
         const live = liveEntry()
-        return [name, cliPathOf(live) || 'auto', regionOf(live), configDirOf(live) || 'auto', optionsOf(live).model || FOLLOW_CLI_ID, effortOf(live) || FOLLOW_REQUEST_ID, String(contextWindowOf(live) || 'auto')]
+        return [name, cliPathOf(live) || 'auto', regionOf(live), configDirOf(live) || 'auto', modelIdOf(optionsOf(live).model) || FOLLOW_CLI_ID, effortOf(live) || FOLLOW_REQUEST_ID, String(contextWindowOf(live) || 'auto')]
       }
     }
   }
