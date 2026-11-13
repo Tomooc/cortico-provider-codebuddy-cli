@@ -1,7 +1,9 @@
 // 模型目录：问 CodeBuddy CLI 自己（ACP 握手），不写死型号。
 // 与 dsh-dkn-codebuddy-cli 的 queryModelCatalog 同一套做法。
 import { spawn } from 'node:child_process'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
+import path from 'node:path'
 import { resolveCli } from './cli.js'
 
 /** ACP 返回的目录 → 本模块用的列表；形状不认识就抛错，不猜。 */
@@ -88,11 +90,56 @@ export function queryCatalog({ cliPath = '', env = process.env, timeoutMs = 4500
   })
 }
 
+/** 目录快照落盘位置；`CORTICO_CODEBUDDY_CATALOG_CACHE` 可覆盖（测试用）。 */
+export function catalogCacheFile(env = process.env) {
+  const override = typeof env.CORTICO_CODEBUDDY_CATALOG_CACHE === 'string' ? env.CORTICO_CODEBUDDY_CATALOG_CACHE.trim() : ''
+  return override || path.join(os.homedir(), '.cortico-provider-codebuddy-cli', 'catalog.json')
+}
+
+/** 同步读回上一份成功快照：`config()` 是同步接口，不能等探测。 */
+function readCatalogCache(file) {
+  try {
+    const raw = JSON.parse(readFileSync(file, 'utf8'))
+    if (!raw || raw.version !== 1 || !raw.entries || typeof raw.entries !== 'object') return {}
+    const out = {}
+    for (const [key, value] of Object.entries(raw.entries)) {
+      if (!value || !Array.isArray(value.models)) continue
+      const models = value.models.filter((item) => item && typeof item.id === 'string' && item.id)
+      if (!models.length) continue
+      out[key] = {
+        models,
+        currentModelId: typeof value.currentModelId === 'string' ? value.currentModelId : '',
+        savedAt: Number(value.savedAt) || 0
+      }
+    }
+    return out
+  } catch { return {} }
+}
+
+function writeCatalogCache(file, cache) {
+  try {
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, JSON.stringify({ version: 1, entries: cache }), 'utf8')
+  } catch {}
+}
+
 /** 带 TTL 的目录缓存；失败按更短的间隔重试，不拖住每次生成。 */
-export function createModelCatalog({ ttlMs = 15 * 60000, retryMs = 60000, now = Date.now } = {}) {
+export function createModelCatalog({ ttlMs = 15 * 60000, retryMs = 60000, now = Date.now, cacheFile = catalogCacheFile() } = {}) {
   const entries = new Map()
+  const cache = readCatalogCache(cacheFile)
   const entryOf = (key) => {
-    if (!entries.has(key)) entries.set(key, { state: 'idle', models: [], currentModelId: '', error: '', attemptedAt: 0, promise: null })
+    if (!entries.has(key)) {
+      // 有落盘快照就先拿它顶上：`config()` 同步返回时也能列出模型与倍率，不必等这次探测。
+      const saved = cache[key]
+      entries.set(key, {
+        state: saved ? 'ready' : 'idle',
+        models: saved ? saved.models : [],
+        currentModelId: saved ? saved.currentModelId : '',
+        error: '',
+        attemptedAt: 0,
+        promise: null
+      })
+    }
     return entries.get(key)
   }
   const snapshot = (cliPath = '') => {
@@ -115,6 +162,8 @@ export function createModelCatalog({ ttlMs = 15 * 60000, retryMs = 60000, now = 
           entry.currentModelId = result.currentModelId
           entry.error = ''
           entry.state = 'ready'
+          cache[key] = { models: result.models, currentModelId: result.currentModelId, savedAt: now() }
+          writeCatalogCache(cacheFile, cache)
         })
         .catch((error) => {
           entry.state = entry.models.length ? 'stale' : 'error'

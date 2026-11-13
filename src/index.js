@@ -238,12 +238,18 @@ function configGroup(name, entry, language) {
   void catalog.get({ cliPath, env: cliEnv })
   const snapshot = catalog.snapshot(cliPath)
   const modelIds = snapshot.models.map((model) => model.id).filter((id) => id && id !== FOLLOW_CLI_ID)
+  // 框架的配置下拉只渲染 enum 里的字符串，选项标签 = 值本身，挂不上额外标签；
+  // 所以把每个模型的积分倍率写进字段描述，保证端点页能看见「哪个模型 ×多少」。
+  const creditRows = snapshot.models
+    .filter((model) => model.id && model.id !== FOLLOW_CLI_ID && creditsLabel(model.credits))
+    .map((model) => `${model.id} ${creditsLabel(model.credits)}`)
+  const creditNote = creditRows.length ? `\n积分倍率：${creditRows.join(' · ')}。` : ''
   const modelProperties = modelIds.length
     ? {
       type: 'string',
       enum: [FOLLOW_CLI_ID, ...modelIds],
       title: '模型（插件 · --model）',
-      description: `来自 CodeBuddy CLI 的模型目录（共 ${modelIds.length} 个）；选「跟随 CLI 当前模型」则不传 --model。`
+      description: `来自 CodeBuddy CLI 的模型目录（共 ${modelIds.length} 个）；选「跟随 CLI 当前模型」则不传 --model。${creditNote}`
     }
     : {
       type: 'string',
