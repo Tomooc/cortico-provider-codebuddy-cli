@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.6
+
+- 新增「区域（国际版 / 国内版）」端点配置：`auto`（检测到 `~/.dsh-codebuddy-cli-intl` 即走国际版）/ `intl` / `cn` / `official`。国际版会注入 `CODEBUDDY_CONFIG_DIR` 与 `CODEBUDDY_INTERNET_ENVIRONMENT=public`；不带这两个变量时 CLI 会落到官方默认 home（`~/.codebuddy`）拿国内凭据去打 `copilot.tencent.com`，生成阶段直接 401。
+- 新增「CLI 配置目录」：留空按区域取默认（国际版 `~/.dsh-codebuddy-cli-intl`，国内版 `~/.dsh-codebuddy-cli-cn`），填了则覆盖。
+- `src/cli.js` 新增 `resolveCliEnv({ region, configDir })`；`cliCandidates()` 补上 `%LOCALAPPDATA%\dsh-codebuddy-cli-{intl,cn}\cli`。
+- `src/model-catalog.js` 的 ACP 探测接受 `env` 并传给 spawn，与生成路径共用同一份区域环境。
+- `src/index.js` 用 `cliEnvOf()` 统一解析，接入 `respondWith` 与 `listModels`；`compatibilityKey()` 纳入 `region` / `configDir`。
+- 新增 `tools/probe-intl-e2e.mjs`：端到端验证信封 → spawn（插件自己的区域 env）→ `structured_output` → 严格校验。
+- 实测：Coopanion 0.2.20（`cortico.api = 6`）加载通过；`POST /api/providers/codebuddy-intl/test` 返回 `{"ok":true,"status":200,"model":"hy4free"}`。
+
 ## 0.2.5
 
 - 仓库改名为 `cortico-provider-codebuddy-cli`，与插件包名对齐；README 标题与开头的「仓库名 / 包名」对照同步更新，并注明旧名 `coopanion-workbuddy-cli` 会自动重定向。

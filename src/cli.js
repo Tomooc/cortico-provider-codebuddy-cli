@@ -1,5 +1,6 @@
 // 官方 CodeBuddy CLI 的子进程调度：无状态、一次调用、只信 stdout 的 JSON。
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { access, readFile, stat } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -39,8 +40,11 @@ export function cliCandidates(configured = '') {
   push(configured, 'config')
   push(process.env.CODEBUDDY_CLI_PATH, 'env')
   const names = IS_WIN ? ['codebuddy.exe', 'codebuddy.cmd', 'codebuddy-code.exe', 'cbc.exe'] : ['codebuddy', 'codebuddy-code', 'cbc']
+  const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
   const roots = [
-    path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'codebuddy', 'bin'),
+    path.join(localAppData, 'codebuddy', 'bin'),
+    path.join(localAppData, 'dsh-codebuddy-cli-intl', 'cli'),
+    path.join(localAppData, 'dsh-codebuddy-cli-cn', 'cli'),
     path.join(os.homedir(), '.codebuddy', 'bin'),
     path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'npm'),
     path.join(process.env.ProgramFiles || 'C:/Program Files', 'codebuddy', 'bin')
@@ -66,6 +70,31 @@ async function unwrapShim(file) {
     }
   } catch {}
   return null
+}
+
+const INTL_HOME = () => path.join(os.homedir(), '.dsh-codebuddy-cli-intl')
+const CN_HOME = () => path.join(os.homedir(), '.dsh-codebuddy-cli-cn')
+
+/**
+ * 区域环境：国际版 CLI 必须同时带 CONFIG_DIR 与 INTERNET_ENVIRONMENT=public，
+ * 否则会落到官方默认 home（~/.codebuddy）用国内那份失效凭据，直接 401。
+ * region: auto（存在国际版 home 就走国际版）/ intl / cn / official（完全不动环境）。
+ */
+export function resolveCliEnv({ region = 'auto', configDir = '' } = {}) {
+  const pick = String(region || 'auto').trim().toLowerCase()
+  if (pick === 'official' || pick === 'default' || pick === 'none') return {}
+  const explicit = typeof configDir === 'string' ? configDir.trim() : ''
+  if (pick === 'intl' || pick === 'cn') {
+    const dir = explicit || (pick === 'intl' ? INTL_HOME() : CN_HOME())
+    return {
+      CODEBUDDY_CONFIG_DIR: dir,
+      CODEBUDDY_INTERNET_ENVIRONMENT: pick === 'intl' ? 'public' : 'internal'
+    }
+  }
+  if (explicit) return { CODEBUDDY_CONFIG_DIR: explicit, CODEBUDDY_INTERNET_ENVIRONMENT: 'public' }
+  if (existsSync(INTL_HOME())) return { CODEBUDDY_CONFIG_DIR: INTL_HOME(), CODEBUDDY_INTERNET_ENVIRONMENT: 'public' }
+  if (existsSync(CN_HOME())) return { CODEBUDDY_CONFIG_DIR: CN_HOME(), CODEBUDDY_INTERNET_ENVIRONMENT: 'internal' }
+  return {}
 }
 
 /** 返回 { command, args }；找不到时抛 CLI_NOT_FOUND。 */

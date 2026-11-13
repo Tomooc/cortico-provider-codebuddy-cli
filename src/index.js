@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto'
 import { GenerationError, unknownMeters } from 'cortico/core/generation.ts'
 import { MODEL_SYSTEM_PROMPT, buildEnvelope, requestTools } from './envelope.js'
-import { readCliResult, resolveCli, runCli } from './cli.js'
+import { readCliResult, resolveCli, resolveCliEnv, runCli } from './cli.js'
 import { parseStructuredOutput } from './result.js'
 import { baseResponse, metersFromUsage, streamResponse, usageOf } from './response.js'
 import { createModelCatalog } from './model-catalog.js'
@@ -26,6 +26,15 @@ export const EFFORTS = [
   { id: 'max', label: 'max · 最深' }
 ]
 const EFFORT_IDS = EFFORTS.map((item) => item.id)
+
+/** 区域：auto 按本机存在的 home 自动选；official 完全不改环境。 */
+export const REGIONS = [
+  { id: 'auto', label: '自动（有 ~/.dsh-codebuddy-cli-intl 就走国际版）' },
+  { id: 'intl', label: '国际版（CODEBUDDY_INTERNET_ENVIRONMENT=public）' },
+  { id: 'cn', label: '国内版（CODEBUDDY_INTERNET_ENVIRONMENT=internal）' },
+  { id: 'official', label: '官方默认（不注入任何区域变量）' }
+]
+const REGION_IDS = REGIONS.map((item) => item.id)
 
 /** 上下文窗口可手动改的范围（token）。 */
 export const CONTEXT_WINDOW_MIN = 16000
@@ -57,6 +66,24 @@ function cliPathOf(entry) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+/** 配置目录：留空则按区域取默认（国际版 ~/.dsh-codebuddy-cli-intl）。 */
+function configDirOf(entry) {
+  const value = optionsOf(entry).configDir
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function regionOf(entry) {
+  const value = optionsOf(entry).region
+  if (typeof value !== 'string') return 'auto'
+  const trimmed = value.trim().toLowerCase()
+  return REGION_IDS.includes(trimmed) ? trimmed : 'auto'
+}
+
+/** 生成与探测共用同一份区域环境。 */
+function cliEnvOf(entry) {
+  return { ...process.env, ...resolveCliEnv({ region: regionOf(entry), configDir: configDirOf(entry) }) }
+}
+
 /** 手动上下文窗口；0 = 没设，用探测值。 */
 function contextWindowOf(entry) {
   return intOption(optionsOf(entry).contextWindow, CONTEXT_WINDOW_MIN, CONTEXT_WINDOW_MAX, 0)
@@ -73,7 +100,7 @@ function effortOf(entry) {
 
 function normalize(entry) {
   const options = { ...optionsOf(entry) }
-  for (const key of ['cliPath', 'model']) {
+  for (const key of ['cliPath', 'model', 'configDir', 'region']) {
     if (typeof options[key] === 'string') {
       const trimmed = options[key].trim()
       if (trimmed) options[key] = trimmed
@@ -163,6 +190,7 @@ async function respondWith(name, entry, host, request, options) {
     const result = await runCli(invocation, buildArgs({ model, effort, schema: envelope.schema, maxTurns }), {
       input: envelope.prompt,
       timeoutMs,
+      env: cliEnvOf(live),
       signal: options.signal
     })
     const parsedCli = readCliResult(result.stdout, result.stderr)
@@ -197,8 +225,9 @@ async function respondWith(name, entry, host, request, options) {
 function configGroup(name, entry, language) {
   const key = (field) => `providers.${name}.options.${field}`
   const cliPath = cliPathOf(entry)
+  const cliEnv = cliEnvOf(entry)
   // 顺手踢一次探测；失败不抛，`listModels()` 会给出结论。
-  void catalog.get({ cliPath })
+  void catalog.get({ cliPath, env: cliEnv })
   const snapshot = catalog.snapshot(cliPath)
   const modelIds = snapshot.models.map((model) => model.id).filter((id) => id && id !== FOLLOW_CLI_ID)
   const modelProperties = modelIds.length
@@ -240,6 +269,17 @@ function configGroup(name, entry, language) {
           title: 'CLI 路径',
           description: 'codebuddy 可执行文件；留空自动查找安装目录与 PATH。'
         },
+        [key('region')]: {
+          type: 'string',
+          enum: [...REGION_IDS],
+          title: '区域（国际版 / 国内版）',
+          description: '国际版会注入 CODEBUDDY_INTERNET_ENVIRONMENT=public 与 CODEBUDDY_CONFIG_DIR；官方默认表示完全不改环境。'
+        },
+        [key('configDir')]: {
+          type: 'string',
+          title: 'CLI 配置目录',
+          description: '留空按区域取默认（国际版 ~/.dsh-codebuddy-cli-intl，国内版 ~/.dsh-codebuddy-cli-cn）；填了则覆盖。'
+        },
         [key('timeoutMs')]: {
           type: 'integer',
           title: '超时（毫秒）',
@@ -272,6 +312,10 @@ const MODULE = {
     const settings = optionsOf(entry)
     if (settings.cliPath !== undefined && typeof settings.cliPath !== 'string') throw new Error('cliPath 必须是字符串')
     if (settings.model !== undefined && typeof settings.model !== 'string') throw new Error('model 必须是字符串')
+    if (settings.configDir !== undefined && typeof settings.configDir !== 'string') throw new Error('configDir 必须是字符串')
+    if (settings.region !== undefined && settings.region !== '' && !REGION_IDS.includes(String(settings.region).trim().toLowerCase())) {
+      throw new Error(`region 只能是 ${REGION_IDS.join(' / ')}`)
+    }
     if (settings.effort !== undefined && settings.effort !== '' && settings.effort !== FOLLOW_REQUEST_ID && !EFFORT_IDS.includes(settings.effort)) {
       throw new Error(`effort 只能是 ${[FOLLOW_REQUEST_ID, ...EFFORT_IDS].join(' / ')}`)
     }
@@ -310,7 +354,7 @@ const MODULE = {
       listModels: async () => {
         const live = liveEntry()
         const override = contextWindowOf(live)
-        const snapshot = await catalog.get({ cliPath: cliPathOf(live) })
+        const snapshot = await catalog.get({ cliPath: cliPathOf(live), env: cliEnvOf(live) })
         const rows = snapshot.models.map((model) => {
           const window = override || model.contextWindow
           return { id: model.id, displayName: model.displayName, ...(window ? { contextWindow: window } : {}) }
@@ -327,7 +371,7 @@ const MODULE = {
       },
       compatibilityKey() {
         const live = liveEntry()
-        return [name, cliPathOf(live) || 'auto', optionsOf(live).model || FOLLOW_CLI_ID, effortOf(live) || FOLLOW_REQUEST_ID, String(contextWindowOf(live) || 'auto')]
+        return [name, cliPathOf(live) || 'auto', regionOf(live), configDirOf(live) || 'auto', optionsOf(live).model || FOLLOW_CLI_ID, effortOf(live) || FOLLOW_REQUEST_ID, String(contextWindowOf(live) || 'auto')]
       }
     }
   }

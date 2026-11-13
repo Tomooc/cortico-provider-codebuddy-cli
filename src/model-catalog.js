@@ -30,7 +30,7 @@ export function normalizeCatalog(result) {
 }
 
 /** 一次 ACP 探测：只列模型，不发起生成。 */
-export function queryCatalog({ cliPath = '', timeoutMs = 45000 } = {}) {
+export function queryCatalog({ cliPath = '', env = process.env, timeoutMs = 45000 } = {}) {
   return new Promise((resolve, reject) => {
     let settled = false
     let child
@@ -46,7 +46,7 @@ export function queryCatalog({ cliPath = '', timeoutMs = 45000 } = {}) {
       const args = [...(invocation.args || []), '--acp', '--tools', '', '--setting-sources', '',
         '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--no-session-persistence']
       child = spawn(invocation.command, args, {
-        cwd: os.tmpdir(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], shell: invocation.shell === true
+        cwd: os.tmpdir(), env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], shell: invocation.shell === true
       })
       const send = (id, method, params) => child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n')
       let pending = ''
@@ -101,7 +101,7 @@ export function createModelCatalog({ ttlMs = 15 * 60000, retryMs = 60000, now = 
   }
   return {
     snapshot,
-    async get({ cliPath = '', force = false } = {}) {
+    async get({ cliPath = '', env = process.env, force = false } = {}) {
       const key = cliPath || 'auto'
       const entry = entryOf(key)
       if (entry.promise) { await entry.promise; return snapshot(cliPath) }
@@ -109,7 +109,7 @@ export function createModelCatalog({ ttlMs = 15 * 60000, retryMs = 60000, now = 
       if (!force && entry.attemptedAt > 0 && age < (entry.error ? retryMs : ttlMs)) return snapshot(cliPath)
       entry.state = 'checking'
       entry.attemptedAt = now()
-      entry.promise = queryCatalog({ cliPath })
+      entry.promise = queryCatalog({ cliPath, env })
         .then((result) => {
           entry.models = result.models
           entry.currentModelId = result.currentModelId

@@ -1,6 +1,6 @@
 {
   "name": "cortico-provider-codebuddy-cli",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "type": "module",
   "description": "CodeBuddy CLI for Cortico: the official CLI as a stateless, JSON-Schema-only inference backend. The bot keeps tool execution; the CLI only returns {text, toolCalls}.",
   "author": "YG",

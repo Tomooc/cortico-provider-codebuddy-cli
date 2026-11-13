@@ -70,7 +70,18 @@ sh tools/install.sh
 
 - Coopanion 0.2.x（框架 `cortico.api = 6`）。
 - Node ≥ 22。
-- 官方 CodeBuddy CLI 已安装并登录（`codebuddy --version` 可用）。默认查找顺序：`options.cliPath` → `%LOCALAPPDATA%\codebuddy\bin` → `~/.codebuddy/bin` → `%APPDATA%\npm` → PATH。
+- 官方 CodeBuddy CLI 已安装并登录（`codebuddy --version` 可用）。默认查找顺序：`options.cliPath` → `%LOCALAPPDATA%\codebuddy\bin` → `%LOCALAPPDATA%\dsh-codebuddy-cli-{intl,cn}\cli` → `~/.codebuddy/bin` → `%APPDATA%\npm` → PATH。
+
+### 国际版 / 国内版（区域适配）
+
+国际版 CLI 必须同时带这两个环境变量，否则会落到官方默认 home（`~/.codebuddy`）用国内那份凭据去打 `copilot.tencent.com`，生成阶段直接 401：
+
+```
+CODEBUDDY_CONFIG_DIR          = ~/.dsh-codebuddy-cli-intl
+CODEBUDDY_INTERNET_ENVIRONMENT = public
+```
+
+插件用 `resolveCliEnv({ region, configDir })` 统一解析（与 `dsh-codebuddy-cli-intl` 的 `lib/intl/cli-runtime.js` 同一口径），生成路径与 ACP 模型探测共用同一份 env。默认 `region=auto`：本机存在 `~/.dsh-codebuddy-cli-intl` 就走国际版，否则回落到 `~/.dsh-codebuddy-cli-cn`，都没有则不注入任何变量。
 
 ## 端点选项
 
@@ -82,6 +93,8 @@ sh tools/install.sh
 | `options.effort` | `follow`（跟随请求） | **下拉**：`follow` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`，透传 `--effort` |
 | `options.contextWindow` | 探测值 | **整数**，16000–1000000 token，手动覆盖上报给 Cortico 的窗口（决定上下文预算与裁剪） |
 | `options.cliPath` | 自动 | codebuddy 可执行文件路径 |
+| `options.region` | `auto` | **下拉**：`auto`（存在 `~/.dsh-codebuddy-cli-intl` 就走国际版）/ `intl` / `cn` / `official`（完全不注入区域变量） |
+| `options.configDir` | 按区域 | CLI 配置目录；留空取区域默认（国际版 `~/.dsh-codebuddy-cli-intl`，国内版 `~/.dsh-codebuddy-cli-cn`） |
 | `options.timeoutMs` | 180000 | 单次 CLI 调用超时（15000–900000） |
 | `options.maxTurns` | 4 | 透传 `--max-turns`（1–16），防止 CLI 自己多轮跑 |
 
