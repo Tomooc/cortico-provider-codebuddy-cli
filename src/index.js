@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto'
 import { GenerationError, unknownMeters } from 'cortico/core/generation.ts'
 import { MODEL_SYSTEM_PROMPT, buildEnvelope, requestTools } from './envelope.js'
-import { readCliResult, resolveCli, resolveCliEnv, runCli } from './cli.js'
+import { applyCliEnv, readCliResult, resolveCli, runCli } from './cli.js'
 import { parseStructuredOutput } from './result.js'
 import { baseResponse, metersFromUsage, streamResponse, usageOf } from './response.js'
 import { createModelCatalog } from './model-catalog.js'
@@ -81,7 +81,15 @@ function regionOf(entry) {
 
 /** 生成与探测共用同一份区域环境。 */
 function cliEnvOf(entry) {
-  return { ...process.env, ...resolveCliEnv({ region: regionOf(entry), configDir: configDirOf(entry) }) }
+  return applyCliEnv(process.env, { region: regionOf(entry), configDir: configDirOf(entry) })
+}
+
+/** 积分倍率：CLI 的 _meta.credits 形如 "x0.29 credits"，压成 ×0.29 挂到下拉标签上。 */
+function creditsLabel(credits) {
+  const text = typeof credits === 'string' ? credits.trim() : ''
+  if (!text) return ''
+  const matched = text.match(/[x×]\s*([\d.]+)/iu)
+  return matched ? `×${matched[1]}` : text.slice(0, 24)
 }
 
 /** 手动上下文窗口；0 = 没设，用探测值。 */
@@ -357,7 +365,10 @@ const MODULE = {
         const snapshot = await catalog.get({ cliPath: cliPathOf(live), env: cliEnvOf(live) })
         const rows = snapshot.models.map((model) => {
           const window = override || model.contextWindow
-          return { id: model.id, displayName: model.displayName, ...(window ? { contextWindow: window } : {}) }
+          // 框架的 ListedModel 没有倍率字段，下拉只渲染 displayName，所以把倍率拼进标签。
+          const credits = creditsLabel(model.credits)
+          const displayName = credits ? `${model.displayName} · ${credits}` : model.displayName
+          return { id: model.id, displayName, ...(window ? { contextWindow: window } : {}) }
         })
         const head = override ? { ...FOLLOW_CLI, contextWindow: override } : { ...FOLLOW_CLI }
         return [head, ...rows.filter((row) => row.id !== FOLLOW_CLI_ID)]

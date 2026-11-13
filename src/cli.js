@@ -76,25 +76,41 @@ const INTL_HOME = () => path.join(os.homedir(), '.dsh-codebuddy-cli-intl')
 const CN_HOME = () => path.join(os.homedir(), '.dsh-codebuddy-cli-cn')
 
 /**
- * 区域环境：国际版 CLI 必须同时带 CONFIG_DIR 与 INTERNET_ENVIRONMENT=public，
- * 否则会落到官方默认 home（~/.codebuddy）用国内那份失效凭据，直接 401。
- * region: auto（存在国际版 home 就走国际版）/ intl / cn / official（完全不动环境）。
+ * 区域环境片段。
+ * 国际版必须同时带 CONFIG_DIR 与 INTERNET_ENVIRONMENT=public，否则会落到官方默认 home
+ * （~/.codebuddy）用国内那份失效凭据，生成阶段直接 401。
+ * 国内版与官方 dsh-codebuddy-cli-cn 同口径：只设 internal；不显式指定目录就不塞 CONFIG_DIR，
+ * 让 CLI 用官方默认 home（强塞一个不存在的 ~/.dsh-codebuddy-cli-cn 会让它读不到登录态）。
  */
 export function resolveCliEnv({ region = 'auto', configDir = '' } = {}) {
   const pick = String(region || 'auto').trim().toLowerCase()
   if (pick === 'official' || pick === 'default' || pick === 'none') return {}
   const explicit = typeof configDir === 'string' ? configDir.trim() : ''
-  if (pick === 'intl' || pick === 'cn') {
-    const dir = explicit || (pick === 'intl' ? INTL_HOME() : CN_HOME())
-    return {
-      CODEBUDDY_CONFIG_DIR: dir,
-      CODEBUDDY_INTERNET_ENVIRONMENT: pick === 'intl' ? 'public' : 'internal'
-    }
+  if (pick === 'intl') {
+    return { CODEBUDDY_CONFIG_DIR: explicit || INTL_HOME(), CODEBUDDY_INTERNET_ENVIRONMENT: 'public' }
+  }
+  if (pick === 'cn') {
+    return { ...(explicit ? { CODEBUDDY_CONFIG_DIR: explicit } : {}), CODEBUDDY_INTERNET_ENVIRONMENT: 'internal' }
   }
   if (explicit) return { CODEBUDDY_CONFIG_DIR: explicit, CODEBUDDY_INTERNET_ENVIRONMENT: 'public' }
   if (existsSync(INTL_HOME())) return { CODEBUDDY_CONFIG_DIR: INTL_HOME(), CODEBUDDY_INTERNET_ENVIRONMENT: 'public' }
-  if (existsSync(CN_HOME())) return { CODEBUDDY_CONFIG_DIR: CN_HOME(), CODEBUDDY_INTERNET_ENVIRONMENT: 'internal' }
   return {}
+}
+
+/**
+ * 真正传给子进程的环境。
+ * 国内版与自动回落时，父进程继承来的 CODEBUDDY_CONFIG_DIR 会被清掉，避免国际版通道串到国内版。
+ * official 表示完全不介入：既不注入也不清理。
+ */
+export function applyCliEnv(base = process.env, { region = 'auto', configDir = '' } = {}) {
+  const pick = String(region || 'auto').trim().toLowerCase()
+  const explicit = typeof configDir === 'string' ? configDir.trim() : ''
+  if (pick === 'official' || pick === 'default' || pick === 'none') return { ...base }
+  if (pick === 'auto' && !explicit && !existsSync(INTL_HOME())) return { ...base }
+  const fragment = resolveCliEnv({ region: pick, configDir: explicit })
+  const env = { ...base }
+  if (!fragment.CODEBUDDY_CONFIG_DIR) delete env.CODEBUDDY_CONFIG_DIR
+  return { ...env, ...fragment }
 }
 
 /** 返回 { command, args }；找不到时抛 CLI_NOT_FOUND。 */

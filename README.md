@@ -81,7 +81,11 @@ CODEBUDDY_CONFIG_DIR          = ~/.dsh-codebuddy-cli-intl
 CODEBUDDY_INTERNET_ENVIRONMENT = public
 ```
 
-插件用 `resolveCliEnv({ region, configDir })` 统一解析（与 `dsh-codebuddy-cli-intl` 的 `lib/intl/cli-runtime.js` 同一口径），生成路径与 ACP 模型探测共用同一份 env。默认 `region=auto`：本机存在 `~/.dsh-codebuddy-cli-intl` 就走国际版，否则回落到 `~/.dsh-codebuddy-cli-cn`，都没有则不注入任何变量。
+插件用 `resolveCliEnv({ region, configDir })` 统一解析（与 `dsh-codebuddy-cli-intl` 的 `lib/intl/cli-runtime.js` 同一口径），生成路径与 ACP 模型探测共用同一份 env。默认 `region=auto`：本机存在 `~/.dsh-codebuddy-cli-intl` 就走国际版，国内版只注入 `CODEBUDDY_INTERNET_ENVIRONMENT=internal`，不塞 `CODEBUDDY_CONFIG_DIR`（与官方 `dsh-codebuddy-cli-cn` 同口径，用官方默认 home `~/.codebuddy`），并清掉从父进程继承的 `CODEBUDDY_CONFIG_DIR`，避免两个通道串区。
+
+> 国内版要真正跑通，还需要一份有效的国内登录态：在带 `CODEBUDDY_INTERNET_ENVIRONMENT=internal` 的环境里重新 `/login` 一次。
+
+模型下拉的标签带积分倍率（CLI 的 `_meta.credits`，如 `Hy4 Preview · ×0.29`、`Primary · ×3.31`）。Cortico 的 `ListedModel` 没有倍率字段、端点页只渲染 `displayName`，所以倍率拼进标签，`id` 保持原样不影响 `--model` 透传。
 
 ## 端点选项
 
@@ -94,7 +98,7 @@ CODEBUDDY_INTERNET_ENVIRONMENT = public
 | `options.contextWindow` | 探测值 | **整数**，16000–1000000 token，手动覆盖上报给 Cortico 的窗口（决定上下文预算与裁剪） |
 | `options.cliPath` | 自动 | codebuddy 可执行文件路径 |
 | `options.region` | `auto` | **下拉**：`auto`（存在 `~/.dsh-codebuddy-cli-intl` 就走国际版）/ `intl` / `cn` / `official`（完全不注入区域变量） |
-| `options.configDir` | 按区域 | CLI 配置目录；留空取区域默认（国际版 `~/.dsh-codebuddy-cli-intl`，国内版 `~/.dsh-codebuddy-cli-cn`） |
+| `options.configDir` | 按区域 | CLI 配置目录；留空时国际版取 `~/.dsh-codebuddy-cli-intl`，国内版不注入（用官方默认 home `~/.codebuddy`） |
 | `options.timeoutMs` | 180000 | 单次 CLI 调用超时（15000–900000） |
 | `options.maxTurns` | 4 | 透传 `--max-turns`（1–16），防止 CLI 自己多轮跑 |
 
