@@ -243,13 +243,13 @@ function configGroup(name, entry, language) {
   const creditRows = snapshot.models
     .filter((model) => model.id && model.id !== FOLLOW_CLI_ID && creditsLabel(model.credits))
     .map((model) => `${model.id} ${creditsLabel(model.credits)}`)
-  const creditNote = creditRows.length ? `\n积分倍率：${creditRows.join(' · ')}。` : ''
+  const creditTable = creditRows.length ? `积分倍率：${creditRows.join(' · ')}。` : ''
   const modelProperties = modelIds.length
     ? {
       type: 'string',
       enum: [FOLLOW_CLI_ID, ...modelIds],
       title: '模型（插件 · --model）',
-      description: `来自 CodeBuddy CLI 的模型目录（共 ${modelIds.length} 个）；选「跟随 CLI 当前模型」则不传 --model。${creditNote}`
+      description: `来自 CodeBuddy CLI 的模型目录（共 ${modelIds.length} 个）；选「跟随 CLI 当前模型」则不传 --model。${creditTable ? `\n${creditTable}` : ''}`
     }
     : {
       type: 'string',
@@ -262,7 +262,7 @@ function configGroup(name, entry, language) {
     schema: {
       type: 'object',
       title: 'CodeBuddy CLI 选项（插件）',
-      description: '这里是插件自己的模型 / 推理强度 / 上下文窗口，与上面那格官方「模型」（spec.model）不是一回事：那格决定账本记什么型号，这里决定实际传给 CLI 的 --model 与 --effort。',
+      description: `插件自己的模型 / 推理强度 / 上下文窗口，与官方「模型」（spec.model）不是一回事：那格决定账本记什么型号，这里决定实际传给 CLI 的 --model 与 --effort。${creditTable ? ` ${creditTable}` : ''}`,
       properties: {
         [key('model')]: modelProperties,
         [key('effort')]: {
